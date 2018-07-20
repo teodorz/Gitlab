@@ -1,0 +1,75 @@
+gitlab:
+  container_name: gitlab
+  restart: always
+  image: gitlab/gitlab-ce:latest
+  links:
+    - postgresql:postgresql
+    - redis:redis
+  net: ${CUSTOM_NETWORK_NAME}
+  ports:
+    - "9080:9080"
+    - "9443:443"
+    - "9022:22"
+  expose:
+    - "9880"
+  environment:
+    GITLAB_OMNIBUS_CONFIG: |
+     external_url 'the external url which will be used to access gitlab'
+     # PostgreSQL Configuration
+     postgresql['enable'] = false
+     gitlab_rails['db_username'] = "gitlab"
+     gitlab_rails['db_password'] = "gitlab"
+     gitlab_rails['db_host'] = "postgresql"
+     gitlab_rails['db_port'] = "5432"
+     gitlab_rails['db_database'] = "gitlabhq-production"
+     gitlab_rails['db_adapter'] = 'postgresql'
+     gitlab_rails['db_encoding'] = 'utf8'
+     # Redis Configuration
+     redis['enable'] = false
+     gitlab_rails['redis_host'] = 'redis'
+     gitlab_rails['redis_port'] = '6379'
+     # LDAP Configuration
+     gitlab_rails['ldap_enabled'] = true
+     gitlab_rails['ldap_servers'] = YAML.load <<-'EOS'
+       main:
+         label: 'LDAP'
+         host: 'host url'
+         port: 389
+         uid: 'sAMAccountName'
+         method: 'plain'
+         bind_dn: 'dn of your ldap service account'
+         password: 'ldap service account password'
+         active_directory: true
+         allow_username_or_email_login: false
+         block_auto_created_users: false
+         base: 'ldap full domain'
+         signin_enabled: false
+     EOS
+  volumes:
+    - /data_local/gitlab/config:/etc/gitlab:rw
+    - /data_local/gitlab/logs:/var/log/gitlab:rw
+    - /data_local/gitlab/data:/var/opt/gitlab:rw
+
+postgresql:
+  container_name: postgresql
+  restart: always
+  image: postgres:9.6.9-alpine
+  net: ${CUSTOM_NETWORK_NAME}
+  expose:
+    - "5432"
+  environment:
+    - POSTGRES_USER=gitlab
+    - POSTGRES_PASSWORD=gitlab
+    - POSTGRES_DB=gitlabhq-production
+  volumes:
+    - /data_local/postgresql:/var/lib/postgresql:rw
+
+redis:
+  container_name: redis
+  restart: always
+  image: redis:3.2.12-alpine
+  net: ${CUSTOM_NETWORK_NAME}
+  expose:
+    - "6379"
+  volumes:
+    - /data_local/redis/data:/data
